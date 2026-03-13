@@ -1,99 +1,95 @@
 var express = require("express");
 var router = express.Router();
 
-let { userCreateValidator
-    , userUpdateValidator
-    , handleResultValidator } = require('../utils/validatorHandler')
-
-
+let {
+  userCreateValidator,
+  userUpdateValidator,
+  handleResultValidator,
+} = require("../utils/validatorHandler");
 
 let userController = require("../controllers/users");
 
-
 router.get("/", async function (req, res, next) {
-    let users = await userModel
-        .find({ isDeleted: false }).populate({
-            path: 'role',
-            select: 'name'
-        })
+  try {
+    let users = await userController.GetAllUsers();
     res.send(users);
+  } catch (error) {
+    res.status(500).send({ message: "khong lay duoc danh sach users" });
+  }
 });
 
 router.get("/:id", async function (req, res, next) {
-    try {
-        let result = await userModel
-            .find({ _id: req.params.id, isDeleted: false })
-        if (result.length > 0) {
-            res.send(result);
-        }
-        else {
-            res.status(404).send({ message: "id not found" });
-        }
-    } catch (error) {
-        res.status(404).send({ message: "id not found" });
+  try {
+    let result = await userController.FindById(req.params.id);
+    if (result) {
+      res.send(result);
+    } else {
+      res.status(404).send({ message: "id not found" });
     }
+  } catch (error) {
+    res.status(404).send({ message: "id not found" });
+  }
 });
 
-router.post("/", userCreateValidator, handleResultValidator,
-    async function (req, res, next) {
-        try {
-            let newItem = userController.CreateAnUser(
-                req.body.username,
-                req.body.password, req.body.email, req.body.fullName,
-                req.body.avatarUrl, req.body.role, req.body.status, req.body.loginCount
-            )
-            await newItem.save();
-
-            // populate cho đẹp
-            let saved = await userModel
-                .findById(newItem._id)
-            res.send(saved);
-        } catch (err) {
-            res.status(400).send({ message: err.message });
-        }
-    });
-
-router.put("/:id", userUpdateValidator, handleResultValidator, async function (req, res, next) {
+router.post(
+  "/",
+  userCreateValidator,
+  handleResultValidator,
+  async function (req, res, next) {
     try {
-        let id = req.params.id;
-        //c1
-        let updatedItem = await
-            userModel.findByIdAndUpdate(id, req.body, { new: true });
-
-        if (!updatedItem)
-            return res.status(404).send({ message: "id not found" });
-        //c2
-        // let updatedItem = await userModel.findById(id);
-        // if (updatedItem) {
-        //     let keys = Object.keys(req.body);
-        //     for (const key of keys) {
-        //         getUser[key] = req.body[key]
-        //     }
-        // }
-        // await updatedItem.save()
-        let populated = await userModel
-            .findById(updatedItem._id)
-        res.send(populated);
+      let newItem = userController.CreateAnUser(
+        req.body.username,
+        req.body.password,
+        req.body.email,
+        req.body.role,
+        req.body.fullName,
+        req.body.avatarUrl,
+        req.body.status,
+        req.body.loginCount,
+      );
+      let saved = await newItem;
+      res.send(saved);
     } catch (err) {
-        res.status(400).send({ message: err.message });
+      res.status(400).send({ message: err.message });
     }
-});
+  },
+);
+
+router.put(
+  "/:id",
+  userUpdateValidator,
+  handleResultValidator,
+  async function (req, res, next) {
+    try {
+      let updatedItem = await userController.UpdateById(req.params.id, {
+        username: req.body.username,
+        email: req.body.email,
+        fullName: req.body.fullName,
+        avatarUrl: req.body.avatarUrl,
+        status: req.body.status,
+        roleId: req.body.roleId,
+        password: req.body.password,
+      });
+
+      if (!updatedItem)
+        return res.status(404).send({ message: "id not found" });
+      res.send(updatedItem);
+    } catch (err) {
+      res.status(400).send({ message: err.message });
+    }
+  },
+);
 
 router.delete("/:id", async function (req, res, next) {
-    try {
-        let id = req.params.id;
-        let updatedItem = await userModel.findByIdAndUpdate(
-            id,
-            { isDeleted: true },
-            { new: true }
-        );
-        if (!updatedItem) {
-            return res.status(404).send({ message: "id not found" });
-        }
-        res.send(updatedItem);
-    } catch (err) {
-        res.status(400).send({ message: err.message });
+  try {
+    let deleted = await userController.SoftDeleteById(req.params.id);
+    if (!deleted) {
+      return res.status(404).send({ message: "id not found" });
     }
+    res.send({ message: "deleted" });
+  } catch (err) {
+    res.status(400).send({ message: err.message });
+  }
 });
 
 module.exports = router;
